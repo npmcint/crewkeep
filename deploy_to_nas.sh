@@ -51,7 +51,7 @@ NEWIMG=$(curl -s -H "X-API-Key: $TOKEN" "$API/api/endpoints/3/docker/images/json
 echo "new image: $NEWIMG"
 
 echo "== 4/4 create-or-update stack '$STACK_NAME' =="
-CK_DEEPSEEK_KEY="$(grep '^DEEPSEEK_API_KEY=' ~/jobhunt/.auth.env | head -1 | cut -d= -f2- || true)"
+CK_DEEPSEEK_KEY="$(grep '^DEEPSEEK_API_KEY=' ~/jobhunt/.auth.env | head -1 | sed -E "s/^DEEPSEEK_API_KEY=['\"]?([^'\"]*)['\"]?.*/\1/")"
 [ -n "$CK_DEEPSEEK_KEY" ] || { echo "ABORT: DEEPSEEK_API_KEY not found in ~/jobhunt/.auth.env"; exit 1; }
 NEWIMG="$NEWIMG" CK_DEEPSEEK_KEY="$CK_DEEPSEEK_KEY" "$PY" - <<'PYEOF'
 import json, os, urllib.request
@@ -105,13 +105,14 @@ else:
     print(f"stack created id={res['Id']} name={res.get('Name')}")
 PYEOF
 
-echo "== health check (LAN) =="
+echo "== health check (via Caddy, no host port by design) =="
 for _ in $(seq 1 12); do
-  if curl -s -o /dev/null -w "%{http_code}" http://192.168.1.99:8091/ | grep -q 200; then
-    echo "crewkeep UP on LAN ✅  ($HEAD)"
+  if curl -s -m 5 -H "Host: crewkeep.nastynas.net" \
+       -o /dev/null -w "%{http_code}" http://192.168.1.99:8081/ | grep -q 200; then
+    echo "crewkeep UP via Caddy ✅  ($HEAD) — http://crewkeep.nastynas.net"
     exit 0
   fi
   sleep 5
 done
-echo "ABORT: crewkeep not reachable on 192.168.1.99:8091 after deploy"
+echo "ABORT: crewkeep not reachable via Caddy after deploy"
 exit 1
