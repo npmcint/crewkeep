@@ -26,8 +26,17 @@ def test_applicant_crud():
     assert d["hired_at"] == "" or d["hired_at"] is None
     d = db.update_applicant(aid, status="hired")
     assert d["hired_at"]
+    import pytest
+    with pytest.raises(ValueError):
+        db.update_applicant(aid, status="bogus")
     db.delete_applicant(aid)
     assert db.get_applicant(aid) is None
+
+
+def test_blank_name_rejected():
+    import pytest
+    with pytest.raises(ValueError):
+        db.create_applicant("   ")
 
 
 def test_screening_persist():

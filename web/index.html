@@ -281,7 +281,8 @@ function submitApplicant(){
     return r.json().then(function(j){ if(!r.ok) throw new Error(j.detail); return j; });
   }).then(function(a){
     toast("Applicant saved");
-    if(a.resume_text){ screenNow(a.id); } else { renderApps(); }
+    if(a.resume_text){ appDetail(a.id); screenNow(a.id); }
+    else { renderApps(); }
   }).catch(function(e){ toast(e.message); });
 }
 function screenNow(aid){
@@ -412,8 +413,8 @@ function loadStaff(){
       if(!list.length){ $("st_list").innerHTML='<p class="muted">No staff yet.</p>'; return; }
       var h="";
       list.forEach(function(p){
-        var risk=p.risk==="high"?'<span class="badge r-high">at risk</span>':
-               (p.risk==="medium"?'<span class="badge r-medium">medium</span>':"");
+        var risk=(p.status==="active"&&p.risk==="high")?'<span class="badge r-high">at risk</span>':
+               (p.status==="active"&&p.risk==="medium")?'<span class="badge r-medium">medium</span>':"";
         var left=p.status==="left"?'<span class="badge b-rejected">left</span>':"";
         h+='<div class="appcard card" onclick="staffDetail('+p.id+')">'+
            '<div class="top"><span class="nm">'+esc(p.name)+'</span>'+risk+left+'</div>'+

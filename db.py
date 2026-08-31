@@ -160,6 +160,9 @@ def _json_loads(s: str) -> dict:
 def create_applicant(name: str, phone: str = "", email: str = "",
                      source: str = "other", role_applied: str = "",
                      resume_path: str = "", resume_text: str = "") -> int:
+    name = name.strip()
+    if not name:
+        raise ValueError("name is required")
     now = _now()
     conn = connect()
     try:
@@ -221,6 +224,8 @@ def list_applicants(status: str | None = None, q: str | None = None) -> list[dic
 def update_applicant(aid: int, **fields) -> dict | None:
     allowed = {"name", "phone", "email", "source", "role_applied", "status",
                "verdict", "score", "notes"}
+    if "status" in fields and fields["status"] not in APPLICANT_STATUSES:
+        raise ValueError(f"status must be one of {APPLICANT_STATUSES}")
     sets, args = [], []
     for k, v in fields.items():
         if k in allowed and v is not None:

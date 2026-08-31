@@ -38,7 +38,8 @@ def _resume_dir() -> Path:
 # --------------------------------------------------------------------------
 # Auth middleware (fail-closed)
 # --------------------------------------------------------------------------
-PUBLIC_PATHS = {"/api/auth/login", "/api/auth/register", "/", "/index.html"}
+PUBLIC_PATHS = {"/api/auth/login", "/api/auth/register", "/", "/index.html",
+                "/favicon.ico"}
 
 
 @app.middleware("http")
@@ -183,12 +184,14 @@ async def add_applicant(request: Request, name: str = Form(...),
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"could not read resume: {e}")
         resume_path = str(dest)
-    aid = db.create_applicant(name=name, phone=phone, email=email,
-                              source=source, role_applied=role_applied,
-                              resume_path=resume_path, resume_text=resume_text)
+    try:
+        aid = db.create_applicant(name=name, phone=phone, email=email,
+                                  source=source, role_applied=role_applied,
+                                  resume_path=resume_path, resume_text=resume_text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     db.ensure_checks(aid)
     return db.get_applicant(aid)
-
 
 @app.get("/api/applicants/{aid}")
 def applicant(aid: int):
@@ -200,7 +203,10 @@ def applicant(aid: int):
 
 @app.patch("/api/applicants/{aid}")
 def patch_applicant(aid: int, body: dict):
-    d = db.update_applicant(aid, **body)
+    try:
+        d = db.update_applicant(aid, **body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not d:
         raise HTTPException(status_code=404, detail="not found")
     return d
