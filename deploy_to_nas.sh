@@ -51,10 +51,13 @@ NEWIMG=$(curl -s -H "X-API-Key: $TOKEN" "$API/api/endpoints/3/docker/images/json
 echo "new image: $NEWIMG"
 
 echo "== 4/4 create-or-update stack '$STACK_NAME' =="
-NEWIMG="$NEWIMG" "$PY" - <<'PYEOF'
+CK_DEEPSEEK_KEY="$(grep '^DEEPSEEK_API_KEY=' ~/jobhunt/.auth.env | head -1 | cut -d= -f2- || true)"
+[ -n "$CK_DEEPSEEK_KEY" ] || { echo "ABORT: DEEPSEEK_API_KEY not found in ~/jobhunt/.auth.env"; exit 1; }
+NEWIMG="$NEWIMG" CK_DEEPSEEK_KEY="$CK_DEEPSEEK_KEY" "$PY" - <<'PYEOF'
 import json, os, urllib.request
 TOKEN = open('/Users/monday/.hermes/profiles/monday-main/portainer_api_key').read().strip()
 BASE = 'http://192.168.1.99:9000'
+ENV_LIST = [{"name": "DEEPSEEK_API_KEY", "value": os.environ.get("CK_DEEPSEEK_KEY", "")}]
 COMPOSE = """services:
   crewkeep:
     image: crewkeep:latest
@@ -88,13 +91,13 @@ existing = [s for s in stacks if s.get('Name') == 'crewkeep']
 if existing:
     sid = existing[0]['Id']
     res = api(f'/api/stacks/{sid}?endpointId=3',
-              {'StackFileContent': COMPOSE, 'Env': [], 'Prune': True, 'PullImage': False},
+              {'StackFileContent': COMPOSE, 'Env': ENV_LIST, 'Prune': True, 'PullImage': False},
               method='PUT')
     assert res.get('DeploymentStartStatus') == 1, res
     print(f'stack {sid} updated (start status {res.get("DeploymentStartStatus")})')
 else:
     res = api(f'/api/stacks/create/standalone?endpointId=3',
-              {'Name': 'crewkeep', 'StackFileContent': COMPOSE, 'Env': []})
+              {'Name': 'crewkeep', 'StackFileContent': COMPOSE, 'Env': ENV_LIST})
     assert res.get('Id'), res
     print(f"stack created id={res['Id']} name={res.get('Name')}")
 PYEOF
