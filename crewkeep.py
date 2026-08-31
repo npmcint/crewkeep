@@ -35,6 +35,10 @@ def main() -> None:
     pw.add_argument("new_password")
     rm = u_sub.add_parser("delete")
     rm.add_argument("username")
+    adm = u_sub.add_parser("admin")
+    adm.add_argument("username")
+    adm.add_argument("--yes", action="store_true", help="grant admin")
+    adm.add_argument("--no", action="store_true", help="revoke admin")
 
     sub.add_parser("llm-test")
 
@@ -73,6 +77,15 @@ def main() -> None:
             auth.delete_user(args.username)
             print("deleted")
             return
+        if args.u_cmd == "admin":
+            if args.yes == args.no:
+                print("error: pass exactly one of --yes / --no", file=sys.stderr)
+                sys.exit(1)
+            u = auth.set_admin(args.username, is_admin=args.yes)
+            if not u:
+                print(f"error: no such user '{args.username}'", file=sys.stderr)
+                sys.exit(1)
+            print(f"{u['username']} is now {'admin' if u['is_admin'] else 'user'}")
 
 
 if __name__ == "__main__":

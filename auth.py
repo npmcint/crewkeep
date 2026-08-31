@@ -170,6 +170,20 @@ def set_password(username: str, new_password: str) -> None:
         conn.close()
 
 
+def set_admin(username: str, is_admin: bool) -> dict | None:
+    """Promote/demote a user's admin flag. Returns the updated user or None."""
+    conn = connect()
+    try:
+        cur = conn.execute("UPDATE users SET is_admin=? WHERE username=?",
+                           (1 if is_admin else 0, username))
+        conn.commit()
+        if cur.rowcount == 0:
+            return None
+        return get_user(username)
+    finally:
+        conn.close()
+
+
 def authenticate(username: str, password: str) -> dict | None:
     username = username.strip().lower()
     conn = connect()
