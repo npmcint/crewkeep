@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrewKeep</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171e26; --panel2:#1d2630; --line:#2a3542;
+    --text:#e6edf3; --dim:#9aa7b4; --acc:#f0a500; --green:#2ea043;
+    --red:#f85149; --amber:#d29922; --blue:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 12px 80px}
+  header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);
+         padding:8px 12px;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;color:var(--acc)}
+  nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  nav button{background:var(--panel);color:var(--text);border:1px solid var(--line);
+             border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
+  nav button.on{background:var(--acc);color:#141414;border-color:var(--acc);font-weight:600}
+  .btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+       border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+  .btn.primary{background:var(--acc);color:#141414;border-color:var(--acc);font-weight:600}
+  .btn.small{padding:3px 8px;font-size:12px}
+  .btn.danger{color:var(--red);border-color:#5c2624}
+  .btn:disabled{opacity:.5;cursor:default}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+        padding:14px;margin:10px 0}
+  .card h3{margin:0 0 8px;font-size:15px}
+  .muted{color:var(--dim)}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--line);
+        color:var(--text);border-radius:8px;padding:8px;font-size:14px;width:100%;
+        margin:4px 0}
+  textarea{font-family:inherit;min-height:70px}
+  label{font-size:12px;color:var(--dim);display:block;margin-top:6px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:130px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .b-new{background:#1f3a5f;color:#9ecbff}.b-phone_screen{background:#3a2f1f;color:#ffd98a}
+  .b-interview{background:#1f3f2a;color:#7ee2a8}.b-trial{background:#2a1f3f;color:#c9a5ff}
+  .b-hired{background:#0f4d22;color:#7ee2a8}.b-rejected{background:#4d0f0f;color:#ff9c94}
+  .b-pool{background:#20303f;color:#a5c9ff}
+  .v-hire_priority{background:#0f4d22;color:#7ee2a8}.v-consider{background:#3a2f1f;color:#ffd98a}
+  .v-weak{background:#4d2f0f;color:#ffc46b}.v-likely_fake{background:#4d0f0f;color:#ff9c94}
+  .r-high{background:#4d0f0f;color:#ff9c94}.r-medium{background:#3a2f1f;color:#ffd98a}
+  .r-low{background:#0f4d22;color:#7ee2a8}
+  .chip{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--panel2);
+        border:1px solid var(--line);font-size:12px;margin:2px}
+  .appcard{cursor:pointer;transition:border-color .15s}
+  .appcard:hover{border-color:var(--acc)}
+  .appcard .top{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
+  .appcard .nm{font-weight:600;font-size:14px}
+  .kv{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:4px}
+  .note{background:var(--panel2);border-left:3px solid var(--line);border-radius:6px;
+        padding:8px 10px;margin:6px 0;font-size:13px}
+  .note .who{color:var(--dim);font-size:11px}
+  .checkrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+  .checkrow:last-child{border-bottom:none}
+  .checkrow input{width:auto;margin:0}
+  .flag{display:flex;justify-content:space-between;align-items:center;gap:8px;
+        background:var(--panel2);border-radius:8px;padding:8px 10px;margin:6px 0;font-size:13px}
+  .flag.unresolved{border-left:3px solid var(--red)}
+  .qlist{margin:6px 0;padding-left:18px}
+  .qlist li{margin:4px 0}
+  .loginbox{max-width:360px;margin:80px auto}
+  .scorebar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:4px}
+  .scorebar>div{height:100%;background:var(--acc)}
+  .tabs{display:flex;gap:6px;margin:12px 0;flex-wrap:wrap}
+  .tabs button{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+               color:var(--dim);padding:5px 12px;font-size:12px;cursor:pointer}
+  .tabs button.on{color:var(--text);border-color:var(--acc);background:var(--panel2)}
+  .stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .stat:last-child{border-bottom:none}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+         background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+         padding:10px 16px;font-size:13px;z-index:99;max-width:90vw}
+  #gate{position:fixed;inset:0;background:var(--bg);z-index:50;overflow:auto}
+  .hide{display:none!important}
+  .sec-title{font-size:16px;font-weight:600;margin:18px 0 4px;color:var(--acc)}
+  hr{border:none;border-top:1px solid var(--line);margin:12px 0}
+</style>
+</head>
+<body>
+<div id="gate" class="hide">
+  <div class="loginbox card">
+    <h3 style="margin-top:0">CrewKeep</h3>
+    <p class="muted" style="font-size:13px">Hiring + staff retention for the roofing crew.</p>
+    <input id="g_user" placeholder="Username" autocomplete="username">
+    <input id="g_pass" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="row" style="margin-top:8px">
+      <button class="btn primary" id="g_login">Sign in</button>
+      <button class="btn" id="g_register" title="Only for the very first setup">Create first admin</button>
+    </div>
+    <p class="muted" id="g_err" style="font-size:12px;color:var(--red)"></p>
+  </div>
+</div>
+
+<header>
+  <h1>CrewKeep</h1>
+  <nav>
+    <button id="nav_dash" onclick="go('dash')">Dashboard</button>
+    <button id="nav_app" onclick="go('apps')">Applicants</button>
+    <button id="nav_staff" onclick="go('staff')">Staff</button>
+    <button class="btn small" onclick="logout()">Log out</button>
+  </nav>
+</header>
+
+<div class="wrap" id="view"></div>
+<div id="toastbox"></div>
+
+<script>
+"use strict";
+var API = "";
+var ME = null;
+var STATE = {tab:"dash"};
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function toast(m){ var t=document.createElement("div"); t.className="toast"; t.textContent=m;
+  $("toastbox").appendChild(t); setTimeout(function(){ t.remove(); }, 3200); }
+function api(path, opts){
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  if(opts.json !== undefined){ opts.headers["Content-Type"]="application/json";
+    opts.body = JSON.stringify(opts.json); delete opts.json; }
+  return fetch(API+path, opts).then(function(r){
+    if(r.status===401){ showGate(); throw new Error("not authenticated"); }
+    return r.json().then(function(j){
+      if(!r.ok){ throw new Error(j.detail || ("HTTP "+r.status)); }
+      return j; });
+  });
+}
+
+/* ---------- gate ---------- */
+function showGate(){ $("gate").classList.remove("hide"); }
+function hideGate(){ $("gate").classList.add("hide"); }
+function doLogin(){
+  var u=$("g_user").value.trim(), p=$("g_pass").value;
+  $("g_err").textContent="";
+  api("/api/auth/login",{method:"POST",json:{username:u,password:p}})
+    .then(function(){ return boot(); })
+    .catch(function(e){ $("g_err").textContent=e.message; });
+}
+function doRegister(){
+  var u=$("g_user").value.trim(), p=$("g_pass").value;
+  $("g_err").textContent="";
+  api("/api/auth/register",{method:"POST",json:{username:u,password:p,display_name:u}})
+    .then(function(){ return boot(); })
+    .catch(function(e){ $("g_err").textContent=e.message; });
+}
+$("g_login").onclick=doLogin;
+$("g_register").onclick=doRegister;
+$("g_pass").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+$("g_user").addEventListener("keydown",function(e){ if(e.key==="Enter") $("g_pass").focus(); });
+
+function logout(){ api("/api/auth/logout",{method:"POST"}).catch(function(){}).then(function(){
+  ME=null; showGate(); }); }
+
+function boot(){
+  return api("/api/auth/me").then(function(j){
+    ME=j.user; hideGate(); render();
+  }).catch(function(){ showGate(); });
+}
+
+/* ---------- router ---------- */
+function go(tab){ STATE.tab=tab; render(); }
+function render(){
+  var on = STATE.tab;
+  [["dash","nav_dash"],["apps","nav_app"],["staff","nav_staff"]].forEach(function(p){
+    $(p[1]).className = on===p[0] ? "on" : "";
+  });
+  if(on==="dash") renderDash();
+  else if(on==="apps") renderApps();
+  else renderStaff();
+}
+
+/* ---------- dashboard ---------- */
+function renderDash(){
+  api("/api/dashboard").then(function(d){
+    var h="";
+    h+='<div class="card"><h3>Team</h3>'+
+       '<div class="stat"><span>Active staff</span><b>'+d.headcount.active+'</b></div>'+
+       '<div class="stat"><span>Left (all time)</span><b>'+d.headcount.left+'</b></div>'+
+       '<div class="stat"><span>Open early-warning flags</span><b>'+(d.open_flags||0)+'</b></div>';
+    if(d.at_risk.length){
+      h+='<div class="sec-title">At risk (high)</div>';
+      d.at_risk.forEach(function(s){
+        h+='<div class="stat"><span><a href="#" onclick="goStaff('+s.id+');return false">'+esc(s.name)+'</a> <span class="muted">('+esc(s.role)+')</span></span><span class="badge r-high">high</span></div>';
+      });
+    }
+    h+='</div>';
+    h+='<div class="card"><h3>Applicants by stage</h3>';
+    ["new","phone_screen","interview","trial","pool","hired","rejected"].forEach(function(s){
+      h+='<div class="stat"><span><span class="badge b-'+s+'">'+s.replace("_"," ")+'</span></span><b>'+(d.applicants_by_status[s]||0)+'</b></div>';
+    });
+    h+='</div>';
+    var reasons=Object.keys(d.exits_by_reason||{});
+    if(reasons.length){
+      h+='<div class="card"><h3>Why people left</h3>';
+      reasons.forEach(function(r){
+        h+='<div class="stat"><span>'+esc(r)+'</span><b>'+d.exits_by_reason[r]+'</b></div>';
+      });
+      h+='</div>';
+    }
+    h+='<div class="card"><h3>Quick actions</h3><div class="row">'+
+       '<button class="btn primary" onclick="newApplicantForm()">+ Add applicant</button>'+
+       '<button class="btn" onclick="newStaffForm()">+ Add staff</button></div></div>';
+    $("view").innerHTML=h;
+  }).catch(function(e){ $("view").innerHTML='<p class="muted">'+esc(e.message)+'</p>'; });
+}
+function goStaff(id){ STATE.tab="staff"; STATE.staffSel=id; render(); }
+
+/* ---------- applicants ---------- */
+function renderApps(){
+  var v=$("view");
+  v.innerHTML='<div class="card"><h3>Applicants</h3><div class="row">'+
+    '<input id="app_q" placeholder="Search name / phone / role" oninput="loadApps()">'+
+    '<select id="app_s" onchange="loadApps()">'+
+    '<option value="">All stages</option>'+
+    '<option>new</option><option>phone_screen</option><option>interview</option>'+
+    '<option>trial</option><option>pool</option><option>hired</option><option>rejected</option>'+
+    '</select>'+
+    '<button class="btn primary" onclick="newApplicantForm()">+ Add</button></div>'+
+    '<div id="app_list"></div></div>';
+  loadApps();
+}
+function loadApps(){
+  var q=$("app_q")?$("app_q").value:"", s=$("app_s")?$("app_s").value:"";
+  api("/api/applicants?q="+encodeURIComponent(q)+"&status="+encodeURIComponent(s))
+    .then(function(list){
+      if(!list.length){ $("app_list").innerHTML='<p class="muted">No applicants yet. Add the first one.</p>'; return; }
+      var h="";
+      list.forEach(function(a){
+        var vd=a.verdict?('<span class="badge v-'+a.verdict+'">'+a.verdict.replace("_"," ")+'</span>'):'';
+        h+='<div class="appcard card" onclick="appDetail('+a.id+')">'+
+           '<div class="top"><span class="nm">'+esc(a.name)+'</span>'+vd+'</div>'+
+           '<div class="muted" style="font-size:13px">'+esc(a.role_applied||"")+
+           (a.source?(' <span class="chip">'+esc(a.source)+'</span>'):"")+'</div>'+
+           '<div class="kv"><span><span class="badge b-'+a.status+'">'+a.status.replace("_"," ")+'</span></span>'+
+           '<span>Score '+(a.score||"-")+'</span></div>'+
+           (a.score?('<div class="scorebar"><div style="width:'+a.score+'%"></div></div>'):"")+
+           '</div>';
+      });
+      $("app_list").innerHTML=h;
+    }).catch(function(e){ $("app_list").innerHTML='<p class="muted">'+esc(e.message)+'</p>'; });
+}
+
+function newApplicantForm(){
+  var v=$("view");
+  v.innerHTML='<div class="card"><h3>Add applicant</h3>'+
+    '<label>Name *</label><input id="a_name">'+
+    '<div class="row"><div><label>Phone</label><input id="a_phone"></div>'+
+    '<div><label>Email</label><input id="a_email"></div></div>'+
+    '<div class="row"><div><label>Applied for</label><input id="a_role" placeholder="e.g. Roof plumber / Labourer"></div>'+
+    '<div><label>Source</label><select id="a_source">'+
+    '<option value="seek">Seek</option><option value="gumtree">Gumtree</option>'+
+    '<option value="facebook">Facebook</option><option value="referral">Referral</option>'+
+    '<option value="walk_in">Walk-in</option><option value="other">Other</option></select></div></div>'+
+    '<label>Resume (pdf/docx/txt)</label><input type="file" id="a_file" accept=".pdf,.docx,.doc,.txt">'+
+    '<div class="row" style="margin-top:10px">'+
+    '<button class="btn primary" onclick="submitApplicant()">Save</button>'+
+    '<button class="btn" onclick="renderApps()">Cancel</button></div></div>';
+}
+function submitApplicant(){
+  var fd=new FormData();
+  fd.append("name", $("a_name").value.trim());
+  fd.append("phone", $("a_phone").value.trim());
+  fd.append("email", $("a_email").value.trim());
+  fd.append("role_applied", $("a_role").value.trim());
+  fd.append("source", $("a_source").value);
+  var f=$("a_file").files[0];
+  if(f) fd.append("resume", f);
+  if(!fd.get("name")){ toast("Name is required"); return; }
+  fetch(API+"/api/applicants",{method:"POST",body:fd}).then(function(r){
+    if(r.status===401){ showGate(); throw new Error("not authenticated"); }
+    return r.json().then(function(j){ if(!r.ok) throw new Error(j.detail); return j; });
+  }).then(function(a){
+    toast("Applicant saved");
+    if(a.resume_text){ screenNow(a.id); } else { renderApps(); }
+  }).catch(function(e){ toast(e.message); });
+}
+function screenNow(aid){
+  toast("Screening resume…");
+  api("/api/applicants/"+aid+"/screen",{method:"POST"}).then(function(a){
+    toast("Screening done");
+    appDetail(aid);
+  }).catch(function(e){ toast("Screen failed: "+e.message); renderApps(); });
+}
+
+function appDetail(aid){
+  api("/api/applicants/"+aid).then(function(a){
+    var s=a.screening||{};
+    var h='<div class="card">';
+    h+='<div class="top" style="display:flex;justify-content:space-between;align-items:flex-start">'+
+       '<h3 style="margin:0">'+esc(a.name)+'</h3>'+
+       '<span>'+(a.verdict?'<span class="badge v-'+a.verdict+'">'+a.verdict.replace("_"," ")+'</span>':"")+'</span></div>';
+    h+='<p class="muted" style="margin:4px 0 8px">'+esc(a.role_applied||"")+
+       (a.phone?' · '+esc(a.phone):"")+(a.email?' · '+esc(a.email):"")+
+       ' · <span class="chip">'+esc(a.source)+'</span></p>';
+    h+='<div class="row">';
+    [["new","New"],["phone_screen","Phone screen"],["interview","Interview"],["trial","Trial"],
+     ["pool","Pool"],["hired","Hire"],["rejected","Reject"]].forEach(function(p){
+      h+='<button class="btn small '+(a.status===p[0]?"primary":"")+'" onclick="setStatus('+aid+',\''+p[0]+'\')">'+p[1]+'</button>';
+    });
+    h+='</div>';
+    if(a.resume_text){ h+='<div class="row" style="margin-top:8px">'+
+      '<button class="btn small" onclick="screenNow('+aid+')">Run screening</button>'+
+      (a.resume_path?'<a class="btn small" href="/api/applicants/'+aid+'/resume">Open resume</a>':"")+
+      '<button class="btn small danger" onclick="delApp('+aid+')">Delete</button></div>'; }
+    h+='</div>';
+    if(a.resume_text && s.summary){
+      h+='<div class="card"><h3>Screening report</h3>'+
+         '<p>'+esc(s.summary)+'</p>'+
+         '<div class="kv"><span>Score</span><b>'+(s.score||"-")+'/100</b></div>'+
+         '<div class="scorebar"><div style="width:'+(s.score||0)+'%"></div></div>'+
+         '<div class="kv"><span>Role fit</span><b>'+esc(s.role_fit||"-")+'</b></div>'+
+         '<div class="kv"><span>Experience</span><b>'+(s.years_experience==null?"not stated":s.years_experience+" yrs")+'</b></div>'+
+         '<div class="kv"><span>AI-generated likelihood</span><b>'+esc(s.ai_generated_likelihood||"-")+'</b></div>';
+      if((s.ai_generated_reasons||[]).length){
+        h+='<ul class="qlist">'; s.ai_generated_reasons.forEach(function(r){ h+='<li>'+esc(r)+'</li>'; }); h+='</ul>';
+      }
+      if((s.red_flags||[]).length){
+        h+='<div class="sec-title">Red flags</div>';
+        s.red_flags.forEach(function(f){ h+='<div class="note"><b>'+esc(f.flag)+'</b><br>'+esc(f.detail)+'</div>'; });
+      }
+      if((s.consistency_issues||[]).length){
+        h+='<div class="sec-title">Consistency issues</div>';
+        s.consistency_issues.forEach(function(c){ h+='<div class="note">'+esc(c)+'</div>'; });
+      }
+      if((s.licences||[]).length){
+        h+='<div class="sec-title">Licences / certs</div>';
+        s.licences.forEach(function(l){ h+='<span class="chip">'+esc(l)+'</span>'; });
+      }
+      if((s.licence_gaps||[]).length){
+        h+='<div class="sec-title">Licence gaps to check</div>';
+        s.licence_gaps.forEach(function(g){ h+='<div class="note">'+esc(g)+'</div>'; });
+      }
+      if((s.phone_screen_questions||[]).length){
+        h+='<div class="sec-title">Phone-screen questions</div><ol class="qlist">';
+        s.phone_screen_questions.forEach(function(q){ h+='<li>'+esc(q)+'</li>'; });
+        h+='</ol>';
+      }
+      if(s.notes_for_boss){ h+='<div class="note"><b>Plain English:</b> '+esc(s.notes_for_boss)+'</div>'; }
+      h+='</div>';
+    } else if(a.resume_text){
+      h+='<div class="card"><p class="muted">Resume added — run screening to get the report.</p></div>';
+    }
+    if((a.checks||[]).length){
+      h+='<div class="card"><h3>Verification checklist</h3>';
+      a.checks.forEach(function(c){
+        h+='<div class="checkrow"><input type="checkbox" id="chk_'+c.id+'" '+(c.done?"checked":"")+
+           ' onchange="setChk('+a.id+',\''+c.check_name+'\',this.checked)">'+
+           '<span style="flex:1">'+esc(c.check_name.replace(/_/g," "))+'</span></div>';
+      });
+      h+='</div>';
+    }
+    h+='<div class="card"><h3>Notes</h3><div class="row">'+
+       '<input id="note_text" placeholder="Add a note…">'+
+       '<button class="btn primary" onclick="addNote('+aid+')">Add</button></div>';
+    (a.notes||[]).forEach(function(n){
+      h+='<div class="note"><span class="who">'+esc(n.author)+' · '+esc((n.created_at||"").slice(0,10))+'</span><br>'+esc(n.note)+'</div>';
+    });
+    h+='</div>';
+    h+='<button class="btn" onclick="renderApps()">← Back to applicants</button>';
+    $("view").innerHTML=h;
+  }).catch(function(e){ toast(e.message); });
+}
+function setStatus(aid, st){
+  api("/api/applicants/"+aid,{method:"PATCH",json:{status:st}}).then(function(){
+    toast("Moved to "+st); appDetail(aid);
+  }).catch(function(e){ toast(e.message); });
+}
+function setChk(aid, name, done){
+  api("/api/applicants/"+aid+"/checks",{method:"POST",json:{check_name:name,done:done}})
+    .catch(function(e){ toast(e.message); });
+}
+function addNote(aid){
+  var t=$("note_text").value.trim(); if(!t) return;
+  api("/api/applicants/"+aid+"/notes",{method:"POST",json:{note:t}}).then(function(){
+    appDetail(aid);
+  }).catch(function(e){ toast(e.message); });
+}
+function delApp(aid){
+  if(!confirm("Delete this applicant?")) return;
+  api("/api/applicants/"+aid,{method:"DELETE"}).then(function(){ toast("Deleted"); renderApps(); })
+    .catch(function(e){ toast(e.message); });
+}
+
+/* ---------- staff ---------- */
+function renderStaff(){
+  var sel = STATE.staffSel;
+  var v=$("view");
+  v.innerHTML='<div class="card"><h3>Staff</h3><div class="row">'+
+    '<input id="st_q" placeholder="Search name / role / site" oninput="loadStaff()">'+
+    '<select id="st_s" onchange="loadStaff()">'+
+    '<option value="">All</option><option value="active">Active</option>'+
+    '<option value="left">Left</option></select>'+
+    '<button class="btn primary" onclick="newStaffForm()">+ Add staff</button></div>'+
+    '<div id="st_list"></div></div>';
+  loadStaff();
+  if(sel){ staffDetail(sel); STATE.staffSel=null; }
+}
+function loadStaff(){
+  var q=$("st_q")?$("st_q").value:"", s=$("st_s")?$("st_s").value:"";
+  api("/api/staff?q="+encodeURIComponent(q)+"&status="+encodeURIComponent(s))
+    .then(function(list){
+      if(!list.length){ $("st_list").innerHTML='<p class="muted">No staff yet.</p>'; return; }
+      var h="";
+      list.forEach(function(p){
+        var risk=p.risk==="high"?'<span class="badge r-high">at risk</span>':
+               (p.risk==="medium"?'<span class="badge r-medium">medium</span>':"");
+        var left=p.status==="left"?'<span class="badge b-rejected">left</span>':"";
+        h+='<div class="appcard card" onclick="staffDetail('+p.id+')">'+
+           '<div class="top"><span class="nm">'+esc(p.name)+'</span>'+risk+left+'</div>'+
+           '<div class="muted" style="font-size:13px">'+esc(p.role||"")+
+           (p.site?' @ '+esc(p.site):"")+'</div>'+
+           '<div class="kv"><span>Started '+esc(p.start_date||"-")+'</span>'+
+           '<span>'+(p.onboarding||[]).filter(function(m){return m.done;}).length+"/4 onboarding</span></div></div>';
+      });
+      $("st_list").innerHTML=h;
+    }).catch(function(e){ $("st_list").innerHTML='<p class="muted">'+esc(e.message)+'</p>'; });
+}
+
+function newStaffForm(){
+  var v=$("view");
+  v.innerHTML='<div class="card"><h3>Add staff</h3>'+
+    '<label>Name *</label><input id="s_name">'+
+    '<div class="row"><div><label>Phone</label><input id="s_phone"></div>'+
+    '<div><label>Email</label><input id="s_email"></div></div>'+
+    '<div class="row"><div><label>Role</label><input id="s_role" placeholder="e.g. Roof plumber / Labourer"></div>'+
+    '<div><label>Start date</label><input id="s_start" type="date"></div></div>'+
+    '<div class="row"><div><label>Rate</label><input id="s_rate" placeholder="e.g. $38/hr"></div>'+
+    '<div><label>Supervisor</label><input id="s_sup"></div></div>'+
+    '<div class="row"><div><label>Site / crew</label><input id="s_site"></div>'+
+    '<div><label>Skills / tickets</label><input id="s_skills" placeholder="e.g. Colorbond, heights, EWP"></div></div>'+
+    '<label>Notes</label><textarea id="s_notes"></textarea>'+
+    '<div class="row" style="margin-top:10px">'+
+    '<button class="btn primary" onclick="submitStaff()">Save</button>'+
+    '<button class="btn" onclick="renderStaff()">Cancel</button></div></div>';
+}
+function submitStaff(){
+  var body={name:$("s_name").value.trim(),phone:$("s_phone").value.trim(),
+    email:$("s_email").value.trim(),role:$("s_role").value.trim(),
+    start_date:$("s_start").value,rate:$("s_rate").value.trim(),
+    supervisor:$("s_sup").value.trim(),site:$("s_site").value.trim(),
+    skills:$("s_skills").value.trim(),notes:$("s_notes").value.trim()};
+  if(!body.name){ toast("Name is required"); return; }
+  api("/api/staff",{method:"POST",json:body}).then(function(p){
+    toast("Staff added"); staffDetail(p.id);
+  }).catch(function(e){ toast(e.message); });
+}
+
+function staffDetail(sid){
+  api("/api/staff/"+sid).then(function(p){
+    var h='<div class="card">'+
+      '<h3 style="margin:0">'+esc(p.name)+'</h3>'+
+      '<p class="muted" style="margin:4px 0 8px">'+esc(p.role||"")+
+      (p.site?' @ '+esc(p.site):"")+(p.supervisor?' · reports to '+esc(p.supervisor):"")+
+      ' · started '+esc(p.start_date||"-")+(p.rate?' · '+esc(p.rate):"")+'</p>'+
+      '<div class="row">'+
+      '<button class="btn small primary" onclick="stayForm('+sid+')">+ Stay interview</button>'+
+      '<button class="btn small" onclick="flagForm('+sid+')">+ Flag</button>'+
+      (p.status==="active"?'<button class="btn small danger" onclick="exitForm('+sid+')">Record exit</button>':"")+
+      '</div></div>';
+    if(p.skills){ h+='<div class="card"><h3>Skills / tickets</h3>'+p.skills.split(",").map(function(s){return '<span class="chip">'+esc(s.trim())+'</span>';}).join("")+'</div>'; }
+    h+='<div class="card"><h3>Onboarding ('+p.onboarding.filter(function(m){return m.done;}).length+'/4)</h3>';
+    var labels={day1:"Day 1",week1:"Week 1",month1:"Month 1",day90:"Day 90"};
+    p.onboarding.forEach(function(m){
+      h+='<div class="checkrow"><input type="checkbox" '+(m.done?"checked":"")+
+         ' onchange="setOnb('+sid+',\''+m.milestone+'\',this.checked)">'+
+         '<span style="flex:1">'+labels[m.milestone]+' check-in</span></div>';
+    });
+    h+='</div>';
+    h+='<div class="card"><h3>Stay interviews (quarterly)</h3>';
+    if(!p.stay_interviews.length){ h+='<p class="muted">None recorded. The 3 questions: what keeps you here, what might tempt you away, what would make this better?</p>'; }
+    p.stay_interviews.forEach(function(si){
+      h+='<div class="note"><span class="badge r-'+si.risk+'">'+si.risk+' risk</span> <span class="who">'+esc((si.conducted_at||"").slice(0,10))+'</span>'+
+         '<br><b>Keeps:</b> '+esc(si.q_keep||"-")+'<br><b>Tempts away:</b> '+esc(si.q_tempt||"-")+
+         '<br><b>Better if:</b> '+esc(si.q_better||"-")+(si.note?'<br>'+esc(si.note):"")+'</div>';
+    });
+    h+='</div>';
+    var openFlags=p.flags.filter(function(f){return !f.resolved;});
+    h+='<div class="card"><h3>Early-warning flags ('+openFlags.length+' open)</h3>';
+    p.flags.forEach(function(f){
+      h+='<div class="flag '+(f.resolved?"":"unresolved")+'">'+
+         '<span><b>'+esc(f.kind)+'</b> · '+esc(f.note)+' <span class="who">('+esc((f.created_at||"").slice(0,10))+')</span></span>'+
+         (f.resolved?'<span class="badge r-low">resolved</span>':
+          '<button class="btn small" onclick="resFlag('+f.id+','+sid+')">Resolve</button>')+'</div>';
+    });
+    if(!p.flags.length){ h+='<p class="muted">No flags.</p>'; }
+    h+='</div>';
+    if(p.exits.length){
+      h+='<div class="card"><h3>Exit record</h3>';
+      p.exits.forEach(function(e){
+        h+='<div class="note"><b>'+esc(e.reason)+'</b> <span class="who">('+esc(e.exit_date||"")+')</span>'+(e.note?'<br>'+esc(e.note):"")+'</div>';
+      });
+      h+='</div>';
+    }
+    h+='<button class="btn" onclick="renderStaff()">← Back to staff</button>';
+    $("view").innerHTML=h;
+  }).catch(function(e){ toast(e.message); });
+}
+function setOnb(sid, ms, done){
+  api("/api/staff/"+sid+"/onboarding",{method:"POST",json:{milestone:ms,done:done}})
+    .catch(function(e){ toast(e.message); });
+}
+function resFlag(fid, sid){
+  api("/api/flags/"+fid+"/resolve",{method:"POST"}).then(function(){ staffDetail(sid); })
+    .catch(function(e){ toast(e.message); });
+}
+function stayForm(sid){
+  var h='<div class="card"><h3>Stay interview — 3 questions</h3>'+
+    '<label>Date</label><input id="si_date" type="date" value="'+new Date().toISOString().slice(0,10)+'">'+
+    '<label>What keeps you here?</label><textarea id="si_keep"></textarea>'+
+    '<label>What might tempt you away?</label><textarea id="si_tempt"></textarea>'+
+    '<label>What would make this better?</label><textarea id="si_better"></textarea>'+
+    '<div class="row"><div><label>Risk</label><select id="si_risk">'+
+    '<option value="low">Low</option><option value="medium">Medium</option>'+
+    '<option value="high">High</option></select></div>'+
+    '<div><label>Note</label><input id="si_note"></div></div>'+
+    '<div class="row" style="margin-top:10px">'+
+    '<button class="btn primary" onclick="submitStay('+sid+')">Save</button>'+
+    '<button class="btn" onclick="staffDetail('+sid+')">Cancel</button></div></div>';
+  $("view").innerHTML=h;
+}
+function submitStay(sid){
+  api("/api/staff/"+sid+"/stay",{method:"POST",json:{
+    conducted_at:$("si_date").value,q_keep:$("si_keep").value.trim(),
+    q_tempt:$("si_tempt").value.trim(),q_better:$("si_better").value.trim(),
+    risk:$("si_risk").value,note:$("si_note").value.trim()}}).then(function(){
+    toast("Stay interview saved"); staffDetail(sid);
+  }).catch(function(e){ toast(e.message); });
+}
+function flagForm(sid){
+  var h='<div class="card"><h3>Early-warning flag</h3>'+
+    '<label>Type</label><select id="fl_kind">'+
+    '<option value="absence">Absence pattern</option><option value="late">Lateness</option>'+
+    '<option value="complaint">Complaint</option><option value="engagement">Engagement drop</option>'+
+    '<option value="other">Other</option></select>'+
+    '<label>What happened?</label><textarea id="fl_note"></textarea>'+
+    '<div class="row" style="margin-top:10px">'+
+    '<button class="btn primary" onclick="submitFlag('+sid+')">Save</button>'+
+    '<button class="btn" onclick="staffDetail('+sid+')">Cancel</button></div></div>';
+  $("view").innerHTML=h;
+}
+function submitFlag(sid){
+  var n=$("fl_note").value.trim(); if(!n){ toast("Describe the flag"); return; }
+  api("/api/staff/"+sid+"/flags",{method:"POST",json:{kind:$("fl_kind").value,note:n}}).then(function(){
+    toast("Flag saved"); staffDetail(sid);
+  }).catch(function(e){ toast(e.message); });
+}
+function exitForm(sid){
+  var h='<div class="card"><h3>Record exit</h3>'+
+    '<label>Exit date</label><input id="ex_date" type="date" value="'+new Date().toISOString().slice(0,10)+'">'+
+    '<label>Reason (from the exit chat — dig past "better pay")</label><select id="ex_reason">'+
+    '<option value="pay">Pay</option><option value="management">Management / boss</option>'+
+    '<option value="progression">No progression</option><option value="hours">Hours / roster</option>'+
+    '<option value="conditions">Conditions</option><option value="travelled_on">Travelled on</option>'+
+    '<option value="other">Other</option></select>'+
+    '<label>Note</label><textarea id="ex_note"></textarea>'+
+    '<div class="row" style="margin-top:10px">'+
+    '<button class="btn primary" onclick="submitExit('+sid+')">Save exit</button>'+
+    '<button class="btn" onclick="staffDetail('+sid+')">Cancel</button></div></div>';
+  $("view").innerHTML=h;
+}
+function submitExit(sid){
+  api("/api/staff/"+sid+"/exit",{method:"POST",json:{
+    exit_date:$("ex_date").value,reason:$("ex_reason").value,
+    note:$("ex_note").value.trim()}}).then(function(){
+    toast("Exit recorded"); renderStaff();
+  }).catch(function(e){ toast(e.message); });
+}
+
+/* ---------- boot ---------- */
+boot();
+</script>
+</body>
+</html>
