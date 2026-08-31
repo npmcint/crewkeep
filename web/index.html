@@ -420,7 +420,7 @@ function loadStaff(){
            '<div class="muted" style="font-size:13px">'+esc(p.role||"")+
            (p.site?' @ '+esc(p.site):"")+'</div>'+
            '<div class="kv"><span>Started '+esc(p.start_date||"-")+'</span>'+
-           '<span>'+(p.onboarding||[]).filter(function(m){return m.done;}).length+"/4 onboarding</span></div></div>';
+           '<span>'+(p.onboarding||[]).filter(function(m){return m.done;}).length+'/4 onboarding</span></div></div>';
       });
       $("st_list").innerHTML=h;
     }).catch(function(e){ $("st_list").innerHTML='<p class="muted">'+esc(e.message)+'</p>'; });
