@@ -85,8 +85,11 @@ def api(path, body=None, method=None):
     except urllib.error.HTTPError as e:
         return {'_error': e.code, '_body': e.read().decode()[:300]}
 
-# 1) does the stack already exist?
-stacks = api('/api/stacks?filters={"EndpointId":3}')
+# 1) does the stack already exist? (plain GET /api/stacks — the
+#    ?filters={"EndpointId":3} query 404s on Portainer 2.39.5)
+stacks = api('/api/stacks')
+if not isinstance(stacks, list):
+    raise SystemExit(f'ABORT: unexpected stacks response: {stacks}')
 existing = [s for s in stacks if s.get('Name') == 'crewkeep']
 if existing:
     sid = existing[0]['Id']
