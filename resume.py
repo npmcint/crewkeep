@@ -46,3 +46,47 @@ def extract_contacts(text: str) -> dict:
             seen.add(ph)
             out.append(ph)
     return {"emails": sorted(set(emails))[:3], "phones": out[:3]}
+
+
+# lines that never contain a person's name (skip when guessing)
+NAME_SKIP_LINES = ("curriculum vitae", "curriculum vitae.", "cv", "resume",
+                   "résumé", "professional summary", "job application")
+# words that mark a line as prose rather than a name
+NAME_BAD_WORDS = {"seeking", "looking", "professional", "highly", "motivated",
+                  "results", "driven", "position", "opportunity", "summary",
+                  "curriculum", "experienced", "enthusiastic", "dedicated",
+                  "reliable", "hardworking", "skilled", "detail", "dynamic",
+                  "individual", "team", "player", "self", "starter"}
+
+
+def guess_name(text: str, filename: str = "") -> str:
+    """Best-effort applicant name from a resume, for batch import.
+
+    Tries the first plausible line of the parsed text (skipping emails,
+    phones, separators and prose like 'Professional Summary'), then falls
+    back to the filename stem ('Terry Jenkins_1788181307.txt' ->
+    'Terry Jenkins'). Returns '' when nothing usable is found.
+    """
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.lower().rstrip(".:") in NAME_SKIP_LINES:
+            continue
+        low = line.lower()
+        words_raw = re.split(r"\s+", low)
+        if any(w.strip(".,:;") in NAME_BAD_WORDS for w in words_raw):
+            continue
+        # strip emails + phone-like tokens + separators
+        line = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", " ", line)
+        line = re.sub(r"(\+?61\s*)?(\(?\d{2,4}\)?[\s\-.]*\d{3,4}[\s\-.]*\d{3,4})", " ", line)
+        line = re.sub(r"[|·•,;:/\\]+", " ", line)
+        words = [w for w in re.split(r"\s+", line)
+                 if re.search(r"[A-Za-z]", w) and not re.search(r"\d", w)]
+        cand = " ".join(words).strip(" .-")
+        if 1 <= len(words) <= 4 and cand:
+            return cand[:60]
+        break  # only ever judge the first meaningful line
+    stem = Path(filename).stem if filename else ""
+    stem = re.sub(r"_\d+$", "", stem).replace("_", " ").strip()
+    return stem[:60]

@@ -131,3 +131,24 @@ def test_resume_parse_txt(tmp_path):
     assert resume_mod.parse_resume(p) == "line one\n\nline two"
     with pytest.raises(ValueError):
         resume_mod.parse_resume(tmp_path / "cv.png")
+
+
+def test_guess_name_from_first_line():
+    assert resume_mod.guess_name("Terry Jenkins\n0431 876 543 | terry@x.com\nRoof plumber.") == "Terry Jenkins"
+    # phone + email on the name line get stripped
+    assert resume_mod.guess_name("Mick Smith 0401 234 567 mick@x.com\nWhite Card.") == "Mick Smith"
+
+
+def test_guess_name_skips_prose():
+    # resume opens with a template header — falls back to the filename
+    text = "Professional Summary\nA highly motivated and results-driven professional…"
+    assert resume_mod.guess_name(text, "alex_carter_1788181310.txt") == "alex carter"
+
+
+def test_guess_name_skips_cv_header():
+    assert resume_mod.guess_name("Curriculum Vitae\nJohn Smith\n0431 000 111") == "John Smith"
+
+
+def test_guess_name_filename_fallback():
+    assert resume_mod.guess_name("", "Terry Jenkins_1788181307.txt") == "Terry Jenkins"
+    assert resume_mod.guess_name("   ", "cv_final.pdf") == "cv final"

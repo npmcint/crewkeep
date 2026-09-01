@@ -161,7 +161,7 @@ def applicants(status: str | None = None, q: str | None = None):
 
 
 @app.post("/api/applicants")
-async def add_applicant(request: Request, name: str = Form(...),
+async def add_applicant(request: Request, name: str = Form(""),
                         phone: str = Form(""), email: str = Form(""),
                         source: str = Form("other"),
                         role_applied: str = Form(""),
@@ -175,7 +175,7 @@ async def add_applicant(request: Request, name: str = Form(...),
                                 detail="resume must be pdf/docx/txt")
         RESUME_DIR = _resume_dir()
         RESUME_DIR.mkdir(parents=True, exist_ok=True)
-        safe = "".join(c for c in name.strip() if c.isalnum() or c in " _-")[:40]
+        safe = "".join(c for c in (name.strip() or "resume") if c.isalnum() or c in " _-")[:40]
         dest = RESUME_DIR / f"{safe}_{int(__import__('time').time())}{ext}"
         with dest.open("wb") as f:
             shutil.copyfileobj(resume.file, f)
@@ -184,6 +184,12 @@ async def add_applicant(request: Request, name: str = Form(...),
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"could not read resume: {e}")
         resume_path = str(dest)
+    if not name.strip() and resume_text.strip():
+        # batch import: derive the applicant's name from the CV itself
+        name = resume_mod.guess_name(resume_text, resume.filename if resume else "")
+    if not name.strip():
+        raise HTTPException(status_code=400,
+                            detail="name is required (couldn't guess it from the resume)")
     try:
         aid = db.create_applicant(name=name, phone=phone, email=email,
                                   source=source, role_applied=role_applied,

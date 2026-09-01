@@ -154,6 +154,26 @@ def test_applicant_ranking_end_to_end(monkeypatch):
     assert d["rank"] is None and d["pool_size"] == 1
 
 
+def test_batch_add_derives_name_from_resume():
+    _register()
+    _login()
+    # no name field — name is read from the resume's first line
+    files = {"resume": ("terry_jenkins_1788181307.txt", io.BytesIO(
+        b"Terry Jenkins\n0431 876 543 | terry@x.com\nRoof plumber, 14 years."),
+        "text/plain")}
+    r = client.post("/api/applicants", data={"source": "seek"}, files=files)
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Terry Jenkins"
+    # blank resume + blank name = still rejected
+    r = client.post("/api/applicants", data={"name": "   "})
+    assert r.status_code == 400
+    assert "name is required" in r.json()["detail"]
+    # bad extension still rejected even when name is blank
+    files = {"resume": ("cv.exe", io.BytesIO(b"x"), "application/octet-stream")}
+    r = client.post("/api/applicants", data={}, files=files)
+    assert r.status_code == 400
+
+
 def test_staff_retention_routes():
     _register()
     _login()

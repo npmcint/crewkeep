@@ -228,7 +228,8 @@ function renderApps(){
     '<option>new</option><option>phone_screen</option><option>interview</option>'+
     '<option>trial</option><option>pool</option><option>hired</option><option>rejected</option>'+
     '</select>'+
-    '<button class="btn primary" onclick="newApplicantForm()">+ Add</button></div>'+
+    '<button class="btn primary" onclick="newApplicantForm()">+ Add</button>'+
+    '<button class="btn" onclick="batchForm()" title="Upload several resumes at once">+ Batch</button></div>'+
     '<div id="pool_board"></div>'+
     '<div id="app_list"></div></div>';
   loadApps();
@@ -316,6 +317,56 @@ function screenNow(aid){
     toast("Screening done");
     appDetail(aid);
   }).catch(function(e){ toast("Screen failed: "+e.message); renderApps(); });
+}
+
+function batchForm(){
+  var v=$("view");
+  v.innerHTML='<div class="card"><h3>Batch add applicants</h3>'+
+    '<p class="muted" style="font-size:13px">Pick several resumes — each becomes an applicant, the name is read from the CV, and every one is screened automatically (about 7s each).</p>'+
+    '<label>Resumes (pdf/docx/txt — select several)</label>'+
+    '<input type="file" id="b_files" multiple accept=".pdf,.docx,.doc,.txt,.md">'+
+    '<div class="row" style="margin-top:10px">'+
+    '<button class="btn primary" onclick="submitBatch()">Upload &amp; screen all</button>'+
+    '<button class="btn" onclick="renderApps()">Cancel</button></div>'+
+    '<div id="b_progress"></div></div>';
+}
+async function submitBatch(){
+  var files=$("b_files").files;
+  if(!files.length){ toast("Pick at least one resume"); return; }
+  var box=$("b_progress");
+  box.innerHTML="";
+  var done=0, failed=0;
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    var row=document.createElement("div");
+    row.className="note";
+    row.innerHTML='<b>'+esc(f.name)+'</b> — uploading…';
+    box.appendChild(row);
+    var fd=new FormData();
+    fd.append("resume", f);
+    try{
+      var resp=await fetch(API+"/api/applicants",{method:"POST",body:fd});
+      if(resp.status===401){ showGate(); throw new Error("not authenticated"); }
+      var a=await resp.json();
+      if(!resp.ok) throw new Error(a.detail||("HTTP "+resp.status));
+      row.innerHTML='<b>'+esc(a.name)+'</b> — screening…';
+      try{
+        var scr=await api("/api/applicants/"+a.id+"/screen",{method:"POST"});
+        row.innerHTML='<b>'+esc(scr.name)+'</b> — <span class="badge v-'+scr.verdict+'">'+
+          scr.verdict.replace("_"," ")+'</span> score '+scr.score+
+          ' <span class="muted">('+scr.status.replace("_"," ")+')</span>';
+        done++;
+      }catch(e){
+        row.innerHTML='<b>'+esc(a.name)+'</b> — added, but screening failed: '+esc(e.message);
+        failed++;
+      }
+    }catch(e){
+      row.innerHTML='<b>'+esc(f.name)+'</b> — failed: '+esc(e.message);
+      failed++;
+    }
+  }
+  toast(done+" added & screened"+(failed?(", "+failed+" failed"):""));
+  setTimeout(renderApps, 1500);
 }
 
 function appDetail(aid){
