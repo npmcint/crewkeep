@@ -108,6 +108,7 @@
     <button id="nav_dash" onclick="go('dash')">Dashboard</button>
     <button id="nav_app" onclick="go('apps')">Applicants</button>
     <button id="nav_staff" onclick="go('staff')">Staff</button>
+    <button id="nav_fb" onclick="go('fb')">Feedback<span id="fb_badge" class="hide" style="background:var(--acc);color:#141414;border-radius:20px;padding:0 6px;font-size:11px;font-weight:700;margin-left:4px"></span></button>
     <button class="btn small" onclick="logout()">Log out</button>
   </nav>
 </header>
@@ -166,7 +167,7 @@ function logout(){ api("/api/auth/logout",{method:"POST"}).catch(function(){}).t
 
 function boot(){
   return api("/api/auth/me").then(function(j){
-    ME=j.user; hideGate(); render();
+    ME=j.user; hideGate(); updateFbBadge(); render();
   }).catch(function(){ showGate(); });
 }
 
@@ -174,12 +175,76 @@ function boot(){
 function go(tab){ STATE.tab=tab; render(); }
 function render(){
   var on = STATE.tab;
-  [["dash","nav_dash"],["apps","nav_app"],["staff","nav_staff"]].forEach(function(p){
+  [["dash","nav_dash"],["apps","nav_app"],["staff","nav_staff"],["fb","nav_fb"]].forEach(function(p){
     $(p[1]).className = on===p[0] ? "on" : "";
   });
   if(on==="dash") renderDash();
   else if(on==="apps") renderApps();
+  else if(on==="fb") renderFb();
   else renderStaff();
+}
+
+/* ---------- feedback (in-app feature requests / bug reports) ---------- */
+function updateFbBadge(){
+  if(!ME || !ME.is_admin){ return; }
+  api("/api/feedback").then(function(d){
+    var n=(d.counts||{}).new||0, b=$("fb_badge");
+    if(n>0){ b.textContent=n; b.classList.remove("hide"); }
+    else { b.classList.add("hide"); }
+  }).catch(function(){});
+}
+function renderFb(){
+  var v=$("view");
+  v.innerHTML='<div class="card"><h3>Feedback &amp; feature requests</h3>'+
+    '<p class="muted" style="font-size:13px">Found a bug or want a feature? Send it here — it goes straight to the dev list.</p>'+
+    '<label>Type</label><select id="fb_cat">'+
+    '<option value="feature">Feature request</option><option value="bug">Bug report</option>'+
+    '<option value="other">Other</option></select>'+
+    '<label>Details</label><textarea id="fb_msg" placeholder="What should we build or fix?"></textarea>'+
+    '<div class="row" style="margin-top:8px">'+
+    '<button class="btn primary" onclick="submitFb()">Send feedback</button></div></div>'+
+    '<div id="fb_list"></div>';
+  loadFb();
+}
+function submitFb(){
+  var cat=$("fb_cat").value, msg=$("fb_msg").value.trim();
+  if(!msg){ toast("Write something first"); return; }
+  api("/api/feedback",{method:"POST",json:{category:cat,message:msg}}).then(function(){
+    toast("Thanks — feedback recorded"); renderFb();
+  }).catch(function(e){ toast(e.message); });
+}
+function loadFb(){
+  var admin=ME && ME.is_admin;
+  api(admin?"/api/feedback":"/api/feedback/mine").then(function(d){
+    var items=d.items||[];
+    var h='<div class="card"><h3>'+(admin?("All feedback ("+items.length+")"):"Your feedback")+'</h3>';
+    if(!items.length){ h+='<p class="muted">Nothing yet — submit the first one above.</p>'; }
+    items.forEach(function(f){
+      var cls=f.status==="new"?"b-new":f.status==="approved"?"b-interview":
+              f.status==="done"?"b-hired":"b-rejected";
+      h+='<div class="note"><span class="badge '+cls+'">'+esc(f.status)+'</span> '+
+         '<span class="badge b-pool">'+esc(f.category)+'</span> '+
+         '<span class="who">'+esc(f.user_id)+' · '+esc((f.ts||"").slice(0,16).replace("T"," "))+'</span><br>'+
+         esc(f.message)+
+         (f.admin_note?'<br><span class="who">note: '+esc(f.admin_note)+'</span>':"")+'</div>';
+      if(admin){
+        h+='<div class="row" style="margin:2px 0 12px">'+
+           '<input id="fbnote_'+f.id+'" placeholder="Note for '+esc(f.user_id)+' (optional)" style="flex:2">'+
+           '<button class="btn small" onclick="fbStatus('+f.id+',\'approved\')">Approve</button>'+
+           '<button class="btn small" onclick="fbStatus('+f.id+',\'rejected\')">Reject</button>'+
+           '<button class="btn small" onclick="fbStatus('+f.id+',\'done\')">Done</button></div>';
+      }
+    });
+    h+='</div>';
+    $("fb_list").innerHTML=h;
+    updateFbBadge();
+  }).catch(function(e){ $("fb_list").innerHTML='<p class="muted">'+esc(e.message)+'</p>'; });
+}
+function fbStatus(id, status){
+  var note=($("fbnote_"+id)||{}).value||"";
+  api("/api/feedback/"+id+"/status",{method:"POST",json:{status:status,note:note}}).then(function(){
+    toast("Marked "+status); renderFb();
+  }).catch(function(e){ toast(e.message); });
 }
 
 /* ---------- dashboard ---------- */

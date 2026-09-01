@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 import auth
 import db
+import feedback as feedback_mod
 import llm as llm_mod
 import resume as resume_mod
 import screening as screening_mod
@@ -289,6 +290,62 @@ def set_check(aid: int, body: dict):
     if row is None:
         raise HTTPException(status_code=404, detail="check not found")
     return row
+
+
+# --------------------------------------------------------------------------
+# Feedback (in-app feature requests / bug reports — jobhunt pattern)
+# --------------------------------------------------------------------------
+import time as _time
+
+_FB_SUBMISSIONS: dict[str, list[float]] = {}  # user -> recent submit timestamps
+
+
+def _fb_rate_limited(username: str, max_n: int = 5, window_s: int = 900) -> bool:
+    now = _time.time()
+    recent = [t for t in _FB_SUBMISSIONS.get(username, []) if now - t < window_s]
+    if len(recent) >= max_n:
+        _FB_SUBMISSIONS[username] = recent
+        return True
+    recent.append(now)
+    _FB_SUBMISSIONS[username] = recent
+    return False
+
+
+@app.post("/api/feedback")
+def submit_feedback(body: dict, request: Request):
+    u = current_user(request)
+    if _fb_rate_limited(u["username"]):
+        raise HTTPException(429, "too many submissions — try again later")
+    try:
+        item_id = feedback_mod.submit(u["username"], body.get("category", ""),
+                                      body.get("message", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "id": item_id, "message": "thanks — recorded"}
+
+
+@app.get("/api/feedback/mine")
+def feedback_mine(request: Request):
+    u = current_user(request)
+    return {"items": feedback_mod.mine(u["username"])}
+
+
+@app.get("/api/feedback")
+def list_feedback(status: str | None = None, request: Request = None):
+    _require_admin(request)
+    return {"items": feedback_mod.list_items(status=status),
+            "counts": feedback_mod.counts()}
+
+
+@app.post("/api/feedback/{item_id}/status")
+def set_feedback_status(item_id: int, body: dict, request: Request):
+    _require_admin(request)
+    try:
+        item = feedback_mod.set_status(item_id, body.get("status", ""),
+                                       body.get("note", ""))
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return {"ok": True, "item": item}
 
 
 # --------------------------------------------------------------------------

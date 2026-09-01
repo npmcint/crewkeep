@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Every top-level module MUST be listed here (feedback.py lesson from xjobs:
 # omitting one crashes the container with ModuleNotFoundError -> 502).
-COPY auth.py db.py resume.py llm.py screening.py app.py crewkeep.py ./
+COPY auth.py db.py resume.py llm.py screening.py app.py crewkeep.py feedback.py ./
 COPY web/ web/
 
 ENV CREWKEEP_HOST=0.0.0.0

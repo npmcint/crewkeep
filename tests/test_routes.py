@@ -174,6 +174,43 @@ def test_batch_add_derives_name_from_resume():
     assert r.status_code == 400
 
 
+def test_feedback_routes():
+    _register()
+    _login()
+    # self-contained: create a non-admin user for the 403 check
+    assert client.post("/api/auth/users", json={"username": "office2",
+                                                "password": "password1"}).status_code == 200
+    # any logged-in user can submit
+    r = client.post("/api/feedback", json={"category": "feature",
+                                           "message": "Night shift roster view"})
+    assert r.status_code == 200, r.text
+    fid = r.json()["id"]
+    # user sees their own
+    r = client.get("/api/feedback/mine")
+    assert r.status_code == 200
+    assert r.json()["items"][0]["id"] == fid
+    # non-admin cannot list the admin queue
+    client.post("/api/auth/logout")
+    _login("office2", "password1")
+    assert client.get("/api/feedback").status_code == 403
+    # admin can review
+    client.post("/api/auth/logout")
+    _login()
+    r = client.get("/api/feedback")
+    assert r.status_code == 200
+    assert r.json()["counts"]["new"] >= 1
+    r = client.post(f"/api/feedback/{fid}/status",
+                    json={"status": "approved", "note": "building it"})
+    assert r.status_code == 200
+    assert r.json()["item"]["status"] == "approved"
+    assert r.json()["item"]["admin_note"] == "building it"
+    # validation + not found
+    assert client.post("/api/feedback",
+                       json={"category": "bug", "message": ""}).status_code == 400
+    assert client.post("/api/feedback/999999/status",
+                       json={"status": "done"}).status_code == 404
+
+
 def test_staff_retention_routes():
     _register()
     _login()
