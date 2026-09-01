@@ -227,7 +227,22 @@ def run_screen(aid: int):
     if not text.strip():
         raise HTTPException(status_code=400,
                             detail="no resume text to screen — add a resume first")
-    report = screening_mod.screen(d["name"], d.get("role_applied", ""), text)
+    # Pool context = every OTHER in-play applicant with a score, so the
+    # screening can rank this candidate against the field (boss_context).
+    pool = []
+    for other in db.list_applicants():
+        if other["id"] == aid or other["status"] not in db.IN_PLAY_STATUSES:
+            continue
+        if not (other.get("score") or 0) > 0:
+            continue
+        scr = other.get("screening") or {}
+        pool.append({"name": other["name"],
+                     "role_applied": other.get("role_applied", ""),
+                     "score": other.get("score"),
+                     "verdict": other.get("verdict", ""),
+                     "summary": scr.get("summary", "")})
+    report = screening_mod.screen(d["name"], d.get("role_applied", ""), text,
+                                  pool=pool)
     db.set_screening(aid, report)
     return db.get_applicant(aid)
 

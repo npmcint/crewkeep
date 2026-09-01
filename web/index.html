@@ -52,6 +52,9 @@
         border:1px solid var(--line);font-size:12px;margin:2px}
   .appcard{cursor:pointer;transition:border-color .15s}
   .appcard:hover{border-color:var(--acc)}
+  .poolrow{display:flex;justify-content:space-between;align-items:center;gap:8px;
+           padding:7px 8px;border-radius:8px;margin:2px 0;cursor:pointer;transition:background .15s}
+  .poolrow:hover{background:var(--panel2)}
   .appcard .top{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
   .appcard .nm{font-weight:600;font-size:14px}
   .kv{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:4px}
@@ -226,11 +229,32 @@ function renderApps(){
     '<option>trial</option><option>pool</option><option>hired</option><option>rejected</option>'+
     '</select>'+
     '<button class="btn primary" onclick="newApplicantForm()">+ Add</button></div>'+
+    '<div id="pool_board"></div>'+
     '<div id="app_list"></div></div>';
   loadApps();
 }
 function loadApps(){
   var q=$("app_q")?$("app_q").value:"", s=$("app_s")?$("app_s").value:"";
+  api("/api/applicants").then(function(all){
+    var inPlay=all.filter(function(a){ return a.rank && a.pool_size; })
+      .sort(function(x,y){ return (x.rank||999)-(y.rank||999); });
+    var h="";
+    if(inPlay.length){
+      h+='<div class="card" style="padding:10px"><h3 style="margin:0 0 4px">Applicant ranking — best first</h3>';
+      inPlay.forEach(function(a){
+        h+='<div class="poolrow" onclick="appDetail('+a.id+')">'+
+           '<span><b style="color:var(--acc)">#'+a.rank+'</b> '+esc(a.name)+
+           ' <span class="muted" style="font-size:12px">'+esc(a.role_applied||"")+'</span></span>'+
+           '<span style="display:flex;align-items:center;gap:6px">'+
+           (a.verdict?'<span class="badge v-'+a.verdict+'">'+a.verdict.replace("_"," ")+'</span>':"")+
+           '<span class="badge b-'+a.status+'">'+a.status.replace("_"," ")+'</span>'+
+           '<b>'+a.score+'</b></span></div>';
+      });
+      h+='<p class="muted" style="font-size:11px;margin:4px 0 0">Rank is live across everyone still in play. Run screening on an applicant to refresh its comparison context.</p>';
+      h+='</div>';
+    }
+    $("pool_board").innerHTML=h;
+  }).catch(function(){});
   api("/api/applicants?q="+encodeURIComponent(q)+"&status="+encodeURIComponent(s))
     .then(function(list){
       if(!list.length){ $("app_list").innerHTML='<p class="muted">No applicants yet. Add the first one.</p>'; return; }
@@ -241,7 +265,8 @@ function loadApps(){
            '<div class="top"><span class="nm">'+esc(a.name)+'</span>'+vd+'</div>'+
            '<div class="muted" style="font-size:13px">'+esc(a.role_applied||"")+
            (a.source?(' <span class="chip">'+esc(a.source)+'</span>'):"")+'</div>'+
-           '<div class="kv"><span><span class="badge b-'+a.status+'">'+a.status.replace("_"," ")+'</span></span>'+
+           '<div class="kv"><span><span class="badge b-'+a.status+'">'+a.status.replace("_"," ")+'</span>'+
+           (a.rank?' <span class="badge b-pool">Rank '+a.rank+'/'+a.pool_size+'</span>':"")+'</span>'+
            '<span>Score '+(a.score||"-")+'</span></div>'+
            (a.score?('<div class="scorebar"><div style="width:'+a.score+'%"></div></div>'):"")+
            '</div>';
@@ -299,7 +324,8 @@ function appDetail(aid){
     var h='<div class="card">';
     h+='<div class="top" style="display:flex;justify-content:space-between;align-items:flex-start">'+
        '<h3 style="margin:0">'+esc(a.name)+'</h3>'+
-       '<span>'+(a.verdict?'<span class="badge v-'+a.verdict+'">'+a.verdict.replace("_"," ")+'</span>':"")+'</span></div>';
+       '<span>'+(a.rank?'<span class="badge b-pool">Rank '+a.rank+'/'+a.pool_size+' in play</span> ':"")+
+       (a.verdict?'<span class="badge v-'+a.verdict+'">'+a.verdict.replace("_"," ")+'</span>':"")+'</span></div>';
     h+='<p class="muted" style="margin:4px 0 8px">'+esc(a.role_applied||"")+
        (a.phone?' · '+esc(a.phone):"")+(a.email?' · '+esc(a.email):"")+
        ' · <span class="chip">'+esc(a.source)+'</span></p>';
@@ -316,8 +342,12 @@ function appDetail(aid){
     h+='</div>';
     if(a.resume_text && s.summary){
       h+='<div class="card"><h3>Screening report</h3>'+
-         '<p>'+esc(s.summary)+'</p>'+
-         '<div class="kv"><span>Score</span><b>'+(s.score||"-")+'/100</b></div>'+
+         '<p>'+esc(s.summary)+'</p>';
+      if(s.boss_context){
+        h+='<div class="note" style="border-left-color:var(--acc);background:var(--panel2)">'+
+           '<b style="color:var(--acc)">Boss context — where they stand</b><br>'+esc(s.boss_context)+'</div>';
+      }
+      h+='<div class="kv"><span>Score</span><b>'+(s.score||"-")+'/100</b></div>'+
          '<div class="scorebar"><div style="width:'+(s.score||0)+'%"></div></div>'+
          '<div class="kv"><span>Role fit</span><b>'+esc(s.role_fit||"-")+'</b></div>'+
          '<div class="kv"><span>Experience</span><b>'+(s.years_experience==null?"not stated":s.years_experience+" yrs")+'</b></div>'+

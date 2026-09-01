@@ -27,6 +27,12 @@ APPLICANT_STATUSES = ("new", "phone_screen", "interview", "trial",
 VERDICTS = ("hire_priority", "consider", "weak", "likely_fake")
 SOURCES = ("seek", "gumtree", "facebook", "referral", "walk_in", "other")
 
+# Statuses that still count as "in play" for the live ranking — hired/rejected
+# drop out of the leaderboard (and therefore out of rank/pool_size).
+IN_PLAY_STATUSES = ("new", "phone_screen", "interview", "trial", "pool")
+# Tie-break order when scores are equal (stronger verdict ranks higher).
+VERDICT_PRIORITY = {"hire_priority": 4, "consider": 3, "weak": 2, "likely_fake": 1}
+
 CHECK_NAMES = ("white_card", "working_at_height", "qbcc_licence",
                "references", "police_check", "first_aid")
 
@@ -178,6 +184,36 @@ def create_applicant(name: str, phone: str = "", email: str = "",
         conn.close()
 
 
+def _ranked_pool() -> list[dict]:
+    """All in-play applicants with a score, ordered by rank: score desc,
+    verdict strength (tie-break), then earliest application first. Computed
+    live on every read — never stored — so the leaderboard stays correct as
+    scores, verdicts and statuses change."""
+    conn = connect()
+    try:
+        rows = [_row(r) for r in conn.execute(
+            "SELECT id, name, role_applied, status, verdict, score, created_at "
+            "FROM applicants WHERE status IN (%s) AND score > 0"
+            % ",".join("?" * len(IN_PLAY_STATUSES)), list(IN_PLAY_STATUSES))]
+    finally:
+        conn.close()
+    rows.sort(key=lambda d: (-(d["score"] or 0),
+                             -VERDICT_PRIORITY.get(d["verdict"] or "", 0),
+                             d["created_at"] or ""))
+    return rows
+
+
+def rank_info(aid: int) -> dict:
+    """Position of an applicant vs the in-play pool: {'rank': int|None,
+    'pool_size': int}. rank is None when the applicant is out of play
+    (hired/rejected) or has no score yet."""
+    pool = _ranked_pool()
+    for i, d in enumerate(pool):
+        if d["id"] == aid:
+            return {"rank": i + 1, "pool_size": len(pool)}
+    return {"rank": None, "pool_size": len(pool)}
+
+
 def get_applicant(aid: int) -> dict | None:
     conn = connect()
     try:
@@ -191,6 +227,7 @@ def get_applicant(aid: int) -> dict | None:
             d["checks"] = [_row(x) for x in conn.execute(
                 "SELECT * FROM applicant_checks WHERE applicant_id=? ORDER BY check_name",
                 (aid,))]
+            d.update(rank_info(aid))
         return d
     finally:
         conn.close()
@@ -214,8 +251,12 @@ def list_applicants(status: str | None = None, q: str | None = None) -> list[dic
     conn = connect()
     try:
         rows = [_row(r) for r in conn.execute(sql, args)]
+        ranks = {d["id"]: i + 1 for i, d in enumerate(_ranked_pool())}
+        pool_size = len(ranks)
         for d in rows:
             d["screening"] = _json_loads(d.get("screening") or "")
+            d["rank"] = ranks.get(d["id"])
+            d["pool_size"] = pool_size
         return rows
     finally:
         conn.close()

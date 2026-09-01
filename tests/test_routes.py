@@ -105,6 +105,55 @@ def test_applicant_flow_with_screening(monkeypatch):
     assert client.get(f"/api/applicants/{aid}").status_code == 404
 
 
+def test_applicant_ranking_end_to_end(monkeypatch):
+    _register()
+    _login()
+    captured = {}
+
+    def fake_llm(messages, timeout=120):
+        user = messages[-1]["content"]
+        captured["user"] = user
+        score = 80 if "Mick Smith" in user else 30
+        return {"summary": "s", "role_fit": "good", "score": score,
+                "years_experience": None, "red_flags": [], "consistency_issues": [],
+                "ai_generated_likelihood": "low", "ai_generated_reasons": [],
+                "licences": [], "licence_gaps": [], "phone_screen_questions": [],
+                "verification_checks": [], "verdict": "hire_priority",
+                "notes_for_boss": "n", "boss_context": "ctx"}
+    monkeypatch.setattr(llm_mod, "llm_json", fake_llm)
+
+    def _add_with_resume(name, body):
+        files = {"resume": (name.lower().replace(" ", "_") + ".txt",
+                            io.BytesIO(body.encode()), "text/plain")}
+        r = client.post("/api/applicants", data={"name": name, "source": "seek"},
+                        files=files)
+        assert r.status_code == 200, r.text
+        return r.json()["id"]
+
+    a1 = _add_with_resume("Mick Smith", "Mick Smith 0401 111 111 mick@x.com\nWhite Card. Roofing for 8 years.")
+    a2 = _add_with_resume("Dave Jones", "Dave Jones 0401 222 222 dave@x.com\nLabourer, no tickets yet.")
+
+    # screen both; first screen sees no pool, second sees Mick
+    assert client.post(f"/api/applicants/{a1}/screen").status_code == 200
+    assert "none yet" in captured["user"]
+    assert client.post(f"/api/applicants/{a2}/screen").status_code == 200
+    assert "Mick Smith" in captured["user"] and "score 80" in captured["user"]
+
+    # list carries live ranks
+    rows = {d["name"]: d for d in client.get("/api/applicants").json()}
+    assert rows["Mick Smith"]["rank"] == 1
+    assert rows["Dave Jones"]["rank"] == 2
+    assert rows["Mick Smith"]["pool_size"] == 2
+    # detail carries rank too
+    d = client.get(f"/api/applicants/{a1}").json()
+    assert d["rank"] == 1 and d["pool_size"] == 2
+    assert d["screening"]["boss_context"] == "ctx"
+    # hired drops out of the ranking
+    client.patch(f"/api/applicants/{a1}", json={"status": "hired"})
+    d = client.get(f"/api/applicants/{a1}").json()
+    assert d["rank"] is None and d["pool_size"] == 1
+
+
 def test_staff_retention_routes():
     _register()
     _login()

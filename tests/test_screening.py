@@ -81,6 +81,50 @@ def test_screen_normalizes_bad_verdict(monkeypatch):
     assert rep["verdict"] == "consider"
 
 
+def test_screen_with_pool_injects_context(monkeypatch):
+    captured = {}
+
+    def fake_llm(messages, timeout=120):
+        captured["user"] = messages[-1]["content"]
+        return {"summary": "solid", "role_fit": "good", "score": 75,
+                "years_experience": 12, "red_flags": [], "consistency_issues": [],
+                "ai_generated_likelihood": "low", "ai_generated_reasons": [],
+                "licences": [], "licence_gaps": [],
+                "phone_screen_questions": ["Q1"], "verification_checks": [],
+                "verdict": "hire_priority", "notes_for_boss": "call him",
+                "boss_context": "Clear #1 of the pool — probe the licence before offering."}
+    monkeypatch.setattr(llm_mod, "llm_json", fake_llm)
+    pool = [{"name": "Alex Carter", "role_applied": "Roof labourer",
+             "score": 10, "verdict": "likely_fake", "summary": "generic template"}]
+    rep = screening.screen("Terry Jenkins", "Roof plumber", RESUME_GOOD, pool=pool)
+    assert "POOL CONTEXT" in captured["user"]
+    assert "Alex Carter" in captured["user"]
+    assert "score 10" in captured["user"]
+    assert rep["boss_context"] == "Clear #1 of the pool — probe the licence before offering."
+
+
+def test_screen_without_pool_tells_llm_first_candidate(monkeypatch):
+    captured = {}
+
+    def fake_llm(messages, timeout=120):
+        captured["user"] = messages[-1]["content"]
+        return {"verdict": "consider", "score": 50, "licences": [],
+                "boss_context": "First candidate in the pool."}
+    monkeypatch.setattr(llm_mod, "llm_json", fake_llm)
+    screening.screen("X", "R", RESUME_GOOD)
+    assert "none yet" in captured["user"]
+    assert "POOL CONTEXT" in captured["user"]
+
+
+def test_screen_tolerates_missing_boss_context(monkeypatch):
+    def fake_llm(messages, timeout=120):
+        return {"verdict": "consider", "score": 50, "licences": []}
+    monkeypatch.setattr(llm_mod, "llm_json", fake_llm)
+    rep = screening.screen("X", "R", RESUME_GOOD)
+    assert "boss_context" not in rep
+    assert rep["verdict"] == "consider"
+
+
 def test_resume_parse_txt(tmp_path):
     p = tmp_path / "cv.txt"
     p.write_text("line one\n\n\n\nline two")

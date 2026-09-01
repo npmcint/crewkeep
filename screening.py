@@ -86,6 +86,7 @@ Rules:
 - "verdict": hire_priority (clearly strong + consistent), consider (worth a phone screen), weak (missing essentials / poor fit / thin detail), likely_fake (strong indicators of fabricated or AI-generated application).
 - score: 0-100 overall recommendation to interview.
 - notes_for_boss: 2-3 plain-English sentences the boss can read on his phone.
+- boss_context: 2-3 plain-English sentences comparing THIS candidate with the REST of the pool (use ONLY the candidates listed in POOL CONTEXT — never invent others): where they sit, what stands out vs the others, and the 1-2 things to probe in the phone screen before offering anything (e.g. licence jurisdiction, relocation, employment gaps, ticket expiry). If POOL CONTEXT says there are no other candidates, state that this is the first/only candidate so far and what to verify.
 
 Reply with ONLY a JSON object, no prose, with EXACTLY these keys:
 {"summary": str, "role_fit": "strong|good|weak|poor", "score": int 0-100,
@@ -94,12 +95,28 @@ Reply with ONLY a JSON object, no prose, with EXACTLY these keys:
  "ai_generated_reasons": [str], "licences": [str], "licence_gaps": [str],
  "consistency_issues": [str], "phone_screen_questions": [str],
  "verification_checks": [str], "verdict": "hire_priority|consider|weak|likely_fake",
- "notes_for_boss": str}"""
+ "notes_for_boss": str, "boss_context": str}"""
 
 
-def screen(name: str, role_applied: str, resume_text: str) -> dict:
-    """Full screening report: deterministic scan + LLM report merged."""
+def screen(name: str, role_applied: str, resume_text: str,
+           pool: list[dict] | None = None) -> dict:
+    """Full screening report: deterministic scan + LLM report merged.
+
+    pool: other in-play applicants (name/role/score/verdict/summary) so the
+    LLM can rank this candidate against the rest for boss_context.
+    """
     det = heuristics(resume_text)
+    if pool:
+        lines = []
+        for p in pool:
+            summary = (p.get("summary") or "").strip()[:200]
+            lines.append(
+                f"- {p.get('name') or '?'} ({p.get('role_applied') or 'role not stated'}): "
+                f"score {p.get('score')}, verdict {p.get('verdict') or 'unscreened'}"
+                + (f" — {summary}" if summary else ""))
+        pool_block = "\n".join(lines)
+    else:
+        pool_block = "(none yet — this is the first screened candidate)"
     user = (
         f"ROLE APPLIED FOR: {role_applied or 'not stated'}\n"
         f"CANDIDATE NAME: {name}\n"
@@ -109,6 +126,8 @@ def screen(name: str, role_applied: str, resume_text: str) -> dict:
         f"- template phrases found: {det['template_hits'] or 'none'}\n"
         f"- contacts found: {det['contacts']}\n"
         f"- automatic flags: {det['flags'] or 'none'}\n"
+        f"\nPOOL CONTEXT (other applicants in play — for boss_context ONLY):\n"
+        f"{pool_block}\n"
         f"Produce the screening report JSON now."
     )
     report = llm_mod.llm_json([
