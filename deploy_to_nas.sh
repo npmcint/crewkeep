@@ -96,7 +96,10 @@ if existing:
     res = api(f'/api/stacks/{sid}?endpointId=3',
               {'StackFileContent': COMPOSE, 'Env': ENV_LIST, 'Prune': True, 'PullImage': False},
               method='PUT')
-    assert res.get('DeploymentStartStatus') == 1, res
+    # DeploymentStartStatus: 1 = success on some Portainer builds; 4 observed
+    # on 2.39.5 with a successful redeploy (container up on the new image).
+    # The Caddy health check below is the real gate — don't assert on the enum.
+    assert res.get('DeploymentStartStatus') in (1, 4), res
     print(f'stack {sid} updated (start status {res.get("DeploymentStartStatus")})')
 else:
     res = api(f'/api/stacks/create/standalone?endpointId=3',
