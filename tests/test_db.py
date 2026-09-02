@@ -119,3 +119,34 @@ def test_dashboard_aggregates():
     assert [a["name"] for a in dash["at_risk"]] == ["S1"]
     assert dash["open_flags"] == 0
     assert dash["exits_by_reason"] == {"pay": 1}
+    assert dash["licences_expiring"] == []
+
+
+def test_staff_licences_and_expiry():
+    import datetime
+    sid = db.create_staff(name="Tradie", role="Roof plumber")
+    # ongoing licence (no expiry) + one expiring soon + one far out
+    db.add_staff_licence(sid, "White Card")
+    soon = (datetime.date.today() + datetime.timedelta(days=12)).isoformat()
+    far = (datetime.date.today() + datetime.timedelta(days=400)).isoformat()
+    soon_row = db.add_staff_licence(sid, "Working at Heights", soon)
+    db.add_staff_licence(sid, "QBCC", far)
+    # blank licence rejected
+    import pytest
+    with pytest.raises(ValueError):
+        db.add_staff_licence(sid, "   ")
+    d = db.get_staff(sid)
+    assert len(d["licences"]) == 3
+    assert d["licences"][0]["licence"] == "Working at Heights"  # dated ones first
+    # expiry warnings on the dashboard (active staff only)
+    dash = db.dashboard()
+    exp = dash["licences_expiring"]
+    assert [x["licence"] for x in exp] == ["Working at Heights"]
+    assert exp[0]["days_left"] == 12
+    assert exp[0]["name"] == "Tradie"
+    # remove a licence
+    db.delete_staff_licence(soon_row["id"])
+    assert len(db.get_staff(sid)["licences"]) == 2
+    # exited staff drop out of the warnings
+    db.record_exit(sid, "2026-09-01", reason="other")
+    assert db.dashboard()["licences_expiring"] == []

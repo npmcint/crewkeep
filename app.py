@@ -450,6 +450,24 @@ def exit_staff(sid: int, body: dict):
     return row
 
 
+@app.post("/api/staff/{sid}/licences")
+def add_licence(sid: int, body: dict):
+    if not db.get_staff(sid):
+        raise HTTPException(status_code=404, detail="not found")
+    try:
+        row = db.add_staff_licence(sid, body.get("licence", ""),
+                                   body.get("expiry_date", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return row
+
+
+@app.delete("/api/staff/licences/{lid}")
+def del_licence(lid: int):
+    db.delete_staff_licence(lid)
+    return {"ok": True}
+
+
 # --------------------------------------------------------------------------
 # Dashboard + static
 # --------------------------------------------------------------------------

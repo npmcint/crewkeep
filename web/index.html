@@ -302,6 +302,15 @@ function renderDash(){
       });
     }
     h+='</div>';
+    if((d.licences_expiring||[]).length){
+      h+='<div class="card"><h3>Licences expiring <span class="muted" style="font-weight:400;font-size:12px">(next 30 days)</span></h3>';
+      d.licences_expiring.forEach(function(x){
+        var cls = x.days_left<0?"b-rejected":x.days_left<=14?"b-phone_screen":"b-new";
+        var lbl = x.days_left<0?("expired "+(0-x.days_left)+"d ago"):(x.days_left===0?"expires today":x.days_left+"d left");
+        h+='<div class="stat"><span><a href="#" onclick="goStaff('+x.staff_id+');return false">'+esc(x.name)+'</a> <span class="muted">'+esc(x.licence)+(x.role?' · '+esc(x.role):"")+'</span></span><span class="badge '+cls+'">'+lbl+'</span></div>';
+      });
+      h+='</div>';
+    }
     h+='<div class="card"><h3>Applicants by stage</h3>';
     ["new","phone_screen","interview","trial","pool","hired","rejected"].forEach(function(s){
       h+='<div class="stat"><span><span class="badge b-'+s+'">'+s.replace("_"," ")+'</span></span><b>'+(d.applicants_by_status[s]||0)+'</b></div>';
@@ -655,6 +664,24 @@ function staffDetail(sid){
       (p.status==="active"?'<button class="btn small danger" onclick="exitForm('+sid+')">Record exit</button>':"")+
       '</div></div>';
     if(p.skills){ h+='<div class="card"><h3>Skills / tickets</h3>'+p.skills.split(",").map(function(s){return '<span class="chip">'+esc(s.trim())+'</span>';}).join("")+'</div>'; }
+    h+='<div class="card"><h3>Licences</h3>';
+    if(!p.licences || !p.licences.length){ h+='<p class="muted" style="margin:0 0 6px">None recorded. White Card, Working at Heights, QBCC, EWP, first aid…</p>'; }
+    p.licences.forEach(function(l){
+      var d = expiryLabel(l.expiry_date);
+      h+='<div class="flag" style="border-left-color:'+(d.cls==="bad"?"var(--red)":d.cls==="soon"?"var(--amber)":"var(--line)")+'">'+
+         '<span><b>'+esc(l.licence)+'</b> <span class="who">'+(l.expiry_date?esc(l.expiry_date):"ongoing")+'</span></span>'+
+         (d.label?'<span class="badge '+(d.cls==="bad"?"b-rejected":d.cls==="soon"?"b-phone_screen":"b-new")+'">'+d.label+'</span>':"")+
+         (p.status==="active"?'<button class="btn small" onclick="delLicence('+l.id+','+sid+')" title="Remove">✕</button>':"")+
+         '</div>';
+    });
+    if(p.status==="active"){
+      h+='<div class="row" style="margin-top:8px;align-items:flex-end">'+
+         '<div style="flex:2"><label>Licence</label><input id="lc_name" placeholder="e.g. White Card"></div>'+
+         '<div><label>Expiry</label><input id="lc_exp" type="date"></div>'+
+         '<div><button class="btn small primary" onclick="addLicence('+sid+')" style="width:100%">+ Add</button></div></div>'+
+         '<p class="muted" style="font-size:11px;margin:2px 0 0">Leave expiry blank for ongoing tickets. Dashboard warns within 30 days.</p>';
+    }
+    h+='</div>';
     h+='<div class="card"><h3>Onboarding ('+p.onboarding.filter(function(m){return m.done;}).length+'/4)</h3>';
     var labels={day1:"Day 1",week1:"Week 1",month1:"Month 1",day90:"Day 90"};
     p.onboarding.forEach(function(m){
@@ -690,6 +717,27 @@ function staffDetail(sid){
     }
     h+='<button class="btn" onclick="renderStaff()">← Back to staff</button>';
     $("view").innerHTML=h;
+  }).catch(function(e){ toast(e.message); });
+}
+function expiryLabel(iso){
+  if(!iso){ return {label:"", cls:"ok"}; }
+  var t=new Date(iso+"T00:00:00"), now=new Date(); now.setHours(0,0,0,0);
+  var d=Math.round((t-now)/86400000);
+  if(d<0){ return {label:"expired "+(0-d)+"d ago", cls:"bad"}; }
+  if(d<=30){ return {label:d===0?"expires today":d+"d left", cls:"soon"}; }
+  return {label:"", cls:"ok"};
+}
+function addLicence(sid){
+  var name=$("lc_name").value.trim(), exp=$("lc_exp").value;
+  if(!name){ toast("Licence name is required"); return; }
+  api("/api/staff/"+sid+"/licences",{method:"POST",json:{licence:name,expiry_date:exp}}).then(function(){
+    toast("Licence added"); staffDetail(sid);
+  }).catch(function(e){ toast(e.message); });
+}
+function delLicence(lid, sid){
+  if(!confirm("Remove this licence record?")) return;
+  api("/api/staff/licences/"+lid,{method:"DELETE"}).then(function(){
+    toast("Removed"); staffDetail(sid);
   }).catch(function(e){ toast(e.message); });
 }
 function setOnb(sid, ms, done){

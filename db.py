@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("CREWKEEP_DATA", str(Path(__file__).parent / "data")))
@@ -146,6 +146,13 @@ def connect() -> sqlite3.Connection:
         exit_date TEXT DEFAULT '',
         reason TEXT DEFAULT 'other',
         note TEXT DEFAULT '',
+        created_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS staff_licences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+        licence TEXT NOT NULL,
+        expiry_date TEXT DEFAULT '',   -- ISO yyyy-mm-dd; '' = ongoing (no expiry)
         created_at TEXT
     );
     """)
@@ -415,6 +422,10 @@ def _staff_detail(conn: sqlite3.Connection, sid: int) -> dict | None:
         "SELECT * FROM staff_flags WHERE staff_id=? ORDER BY created_at DESC", (sid,))]
     d["exits"] = [_row(x) for x in conn.execute(
         "SELECT * FROM exits WHERE staff_id=? ORDER BY created_at DESC", (sid,))]
+    d["licences"] = [_row(x) for x in conn.execute(
+        "SELECT * FROM staff_licences WHERE staff_id=? "
+        "ORDER BY CASE WHEN expiry_date='' THEN 1 ELSE 0 END, expiry_date, id",
+        (sid,))]
     # risk: latest stay interview risk, else low
     d["risk"] = d["stay_interviews"][0]["risk"] if d["stay_interviews"] else "low"
     return d
@@ -531,6 +542,32 @@ def resolve_flag(fid: int) -> None:
         conn.close()
 
 
+def add_staff_licence(sid: int, licence: str, expiry_date: str = "") -> dict:
+    licence = licence.strip()
+    if not licence:
+        raise ValueError("licence name is required")
+    conn = connect()
+    try:
+        cur = conn.execute(
+            "INSERT INTO staff_licences (staff_id, licence, expiry_date, created_at) "
+            "VALUES (?,?,?,?)", (sid, licence, (expiry_date or "").strip(), _now()))
+        conn.commit()
+        r = conn.execute("SELECT * FROM staff_licences WHERE id=?",
+                         (cur.lastrowid,)).fetchone()
+        return dict(r)
+    finally:
+        conn.close()
+
+
+def delete_staff_licence(lid: int) -> None:
+    conn = connect()
+    try:
+        conn.execute("DELETE FROM staff_licences WHERE id=?", (lid,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def record_exit(sid: int, exit_date: str, reason: str = "other", note: str = "") -> dict:
     if reason not in EXIT_REASONS:
         raise ValueError(f"reason must be one of {EXIT_REASONS}")
@@ -573,12 +610,29 @@ def dashboard() -> dict:
         for r in conn.execute(
                 "SELECT e.reason, COUNT(*) c FROM exits e GROUP BY e.reason"):
             exits_by_reason[r["reason"]] = r["c"]
+        # licences expiring within 30 days (active staff only) — ISO dates compare fine
+        today = date.today()
+        horizon = (today + timedelta(days=30)).isoformat()
+        licences_expiring = []
+        for r in conn.execute(
+                "SELECT sl.id, sl.staff_id, sl.licence, sl.expiry_date, s.name, s.role "
+                "FROM staff_licences sl JOIN staff s ON s.id=sl.staff_id "
+                "WHERE s.status='active' AND sl.expiry_date != '' "
+                "AND sl.expiry_date <= ? ORDER BY sl.expiry_date",
+                (horizon,)):
+            days_left = (date.fromisoformat(r["expiry_date"]) - today).days
+            licences_expiring.append({
+                "licence_id": r["id"], "staff_id": r["staff_id"],
+                "name": r["name"], "role": r["role"], "licence": r["licence"],
+                "expiry_date": r["expiry_date"], "days_left": days_left,
+            })
         return {
             "headcount": {"active": active, "left": left},
             "applicants_by_status": by_status,
             "at_risk": at_risk,
             "open_flags": open_flags,
             "exits_by_reason": exits_by_reason,
+            "licences_expiring": licences_expiring,
         }
     finally:
         conn.close()

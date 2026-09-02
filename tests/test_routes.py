@@ -316,3 +316,34 @@ def test_change_password_route():
                              "new_password": "password1"}).status_code == 200
     client.post("/api/auth/logout")
     _login()
+
+
+def test_staff_licence_routes():
+    import datetime
+    _register()
+    _login()
+    r = client.post("/api/staff", json={"name": "L1", "role": "R"})
+    sid = r.json()["id"]
+    # blank licence name → 400
+    assert client.post(f"/api/staff/{sid}/licences",
+                       json={"licence": "  "}).status_code == 400
+    # unknown staff → 404
+    assert client.post("/api/staff/999999/licences",
+                       json={"licence": "X"}).status_code == 404
+    soon = (datetime.date.today() + datetime.timedelta(days=9)).isoformat()
+    r = client.post(f"/api/staff/{sid}/licences",
+                    json={"licence": "Working at Heights", "expiry_date": soon})
+    assert r.status_code == 200
+    lid = r.json()["id"]
+    r = client.post(f"/api/staff/{sid}/licences",
+                    json={"licence": "White Card"})
+    assert r.status_code == 200
+    # staff detail carries licences
+    d = client.get(f"/api/staff/{sid}").json()
+    assert {x["licence"] for x in d["licences"]} == {"Working at Heights", "White Card"}
+    # dashboard warns about the one expiring soon
+    dash = client.get("/api/dashboard").json()
+    assert [x["licence"] for x in dash["licences_expiring"]] == ["Working at Heights"]
+    # delete works — only the ongoing White Card remains
+    assert client.delete(f"/api/staff/licences/{lid}").status_code == 200
+    assert [x["licence"] for x in client.get(f"/api/staff/{sid}").json()["licences"]] == ["White Card"]
