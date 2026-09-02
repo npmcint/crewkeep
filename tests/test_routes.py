@@ -288,3 +288,31 @@ def test_invalid_inputs():
     sid = r.json()["id"]
     assert client.post(f"/api/staff/{sid}/exit",
                        json={"reason": "bogus"}).status_code == 400
+
+
+def test_change_password_route():
+    _register()
+    _login()
+    # wrong current password → 400
+    r = client.post("/api/auth/password",
+                    json={"old_password": "nope", "new_password": "bossnew99"})
+    assert r.status_code == 400
+    assert "current password incorrect" in r.json()["detail"]
+    # too-short new password → 400
+    r = client.post("/api/auth/password",
+                    json={"old_password": "password1", "new_password": "short"})
+    assert r.status_code == 400
+    # happy path: old password stops working, new one logs in
+    assert client.post("/api/auth/password",
+                       json={"old_password": "password1",
+                             "new_password": "bossnew99"}).status_code == 200
+    client.post("/api/auth/logout")
+    assert client.post("/api/auth/login",
+                       json={"username": "boss", "password": "password1"}).status_code == 401
+    _login("boss", "bossnew99")
+    # restore for hygiene
+    assert client.post("/api/auth/password",
+                       json={"old_password": "bossnew99",
+                             "new_password": "password1"}).status_code == 200
+    client.post("/api/auth/logout")
+    _login()

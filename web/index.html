@@ -109,12 +109,28 @@
     <button id="nav_app" onclick="go('apps')">Applicants</button>
     <button id="nav_staff" onclick="go('staff')">Staff</button>
     <button id="nav_fb" onclick="go('fb')">Feedback<span id="fb_badge" class="hide" style="background:var(--acc);color:#141414;border-radius:20px;padding:0 6px;font-size:11px;font-weight:700;margin-left:4px"></span></button>
+    <button class="btn small" id="nav_acct" onclick="openAcct()" title="Change password"></button>
     <button class="btn small" onclick="logout()">Log out</button>
   </nav>
 </header>
 
 <div class="wrap" id="view"></div>
 <div id="toastbox"></div>
+
+<div id="acct_modal" class="hide" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeAcct()">
+  <div class="card" style="width:340px;margin:0">
+    <h3 style="margin-top:0">Change password</h3>
+    <p class="muted" style="font-size:12px;margin:0 0 4px">Signed in as <b id="acct_user"></b></p>
+    <label>Current password</label><input id="pw_old" type="password" autocomplete="current-password">
+    <label>New password (8+ characters)</label><input id="pw_new" type="password" autocomplete="new-password">
+    <label>Confirm new password</label><input id="pw_new2" type="password" autocomplete="new-password">
+    <p class="muted" id="pw_err" style="font-size:12px;color:var(--red)"></p>
+    <div class="row" style="margin-top:8px">
+      <button class="btn primary" onclick="doChangePassword()">Update password</button>
+      <button class="btn" onclick="closeAcct()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -165,9 +181,33 @@ $("g_user").addEventListener("keydown",function(e){ if(e.key==="Enter") $("g_pas
 function logout(){ api("/api/auth/logout",{method:"POST"}).catch(function(){}).then(function(){
   ME=null; showGate(); }); }
 
+/* ---------- change password ---------- */
+function openAcct(){
+  $("acct_user").textContent = (ME && (ME.display_name || ME.username)) || "";
+  $("pw_old").value=""; $("pw_new").value=""; $("pw_new2").value="";
+  $("pw_err").textContent="";
+  $("acct_modal").classList.remove("hide");
+  $("pw_old").focus();
+}
+function closeAcct(){ $("acct_modal").classList.add("hide"); }
+function doChangePassword(){
+  var o=$("pw_old").value, n=$("pw_new").value, n2=$("pw_new2").value, e=$("pw_err");
+  e.textContent="";
+  if(!o || !n){ e.textContent="Fill in all three fields."; return; }
+  if(n.length<8){ e.textContent="New password must be at least 8 characters."; return; }
+  if(n!==n2){ e.textContent="New passwords do not match."; return; }
+  api("/api/auth/password",{method:"POST",json:{old_password:o,new_password:n}}).then(function(){
+    toast("Password updated"); closeAcct();
+  }).catch(function(err){ e.textContent=err.message; });
+}
+$("pw_old").addEventListener("keydown",function(e){ if(e.key==="Enter") $("pw_new").focus(); });
+$("pw_new").addEventListener("keydown",function(e){ if(e.key==="Enter") $("pw_new2").focus(); });
+$("pw_new2").addEventListener("keydown",function(e){ if(e.key==="Enter") doChangePassword(); });
+
 function boot(){
   return api("/api/auth/me").then(function(j){
-    ME=j.user; hideGate(); updateFbBadge(); render();
+    ME=j.user; $("nav_acct").textContent = ME.display_name || ME.username || "Account";
+    hideGate(); updateFbBadge(); render();
   }).catch(function(){ showGate(); });
 }
 
